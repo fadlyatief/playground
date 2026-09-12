@@ -1,0 +1,632 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Pemilah Sampah — kamera langsung, watersplash/waste-classification</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@500;700;900&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root{
+    --asphalt: #17191a;
+    --panel: #1f2224;
+    --panel-raised: #262a2c;
+    --hairline: #33393b;
+    --paper: #ecebe5;
+    --paper-dim: #a9aca9;
+    --amber: #f2b705;
+    --amber-dim: #caa02f;
+    --danger: #e2574c;
+    --ok: #6b8f4e;
+    --radius: 6px;
+  }
+
+  * { box-sizing: border-box; }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    background: var(--asphalt);
+    color: var(--paper);
+    font-family: 'IBM Plex Sans', system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  body {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    padding: 48px 20px 80px;
+  }
+
+  main {
+    width: 100%;
+    max-width: 560px;
+  }
+
+  .hazard-rule {
+    height: 6px;
+    border-radius: 3px;
+    margin-bottom: 28px;
+    background: repeating-linear-gradient(
+      -45deg,
+      var(--amber) 0px, var(--amber) 10px,
+      var(--asphalt) 10px, var(--asphalt) 20px
+    );
+    opacity: 0.9;
+  }
+
+  header h1 {
+    font-family: 'Archivo', sans-serif;
+    font-weight: 900;
+    font-size: clamp(28px, 6vw, 40px);
+    letter-spacing: -0.01em;
+    line-height: 1.05;
+    margin: 0 0 10px;
+  }
+
+  header p {
+    color: var(--paper-dim);
+    font-size: 15px;
+    line-height: 1.55;
+    max-width: 46ch;
+    margin: 0 0 8px;
+  }
+
+  header a { color: var(--amber); text-decoration: none; border-bottom: 1px solid rgba(242,183,5,0.4); }
+  header a:hover { border-bottom-color: var(--amber); }
+
+  .meta-line {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--paper-dim);
+    margin: 18px 0 32px;
+    padding-top: 14px;
+    border-top: 1px solid var(--hairline);
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px 18px;
+  }
+  .meta-line b { color: var(--paper); font-weight: 500; }
+
+  .cam-box {
+    position: relative;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    background: #000;
+    aspect-ratio: 4 / 3;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .cam-box video {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: none;
+  }
+  .cam-box.active video { display: block; }
+
+  .cam-placeholder {
+    text-align: center;
+    padding: 24px;
+    color: var(--paper-dim);
+  }
+  .cam-box.active .cam-placeholder { display: none; }
+  .cam-placeholder .cam-icon {
+    width: 40px; height: 40px;
+    margin: 0 auto 14px;
+    color: var(--amber);
+  }
+  .cam-placeholder .primary-txt { font-size: 15px; font-weight: 500; color: var(--paper); margin-bottom: 4px; }
+  .cam-placeholder .secondary-txt { font-size: 13px; }
+
+  .live-pill {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: rgba(0,0,0,0.55);
+    backdrop-filter: blur(2px);
+    padding: 5px 10px;
+    border-radius: 20px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.03em;
+  }
+  .cam-box.active .live-pill { display: flex; }
+  .live-dot {
+    width: 7px; height: 7px;
+    border-radius: 50%;
+    background: var(--danger);
+    animation: pulse 1.4s ease-in-out infinite;
+  }
+  @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+
+  .scan-flash {
+    position: absolute;
+    inset: 0;
+    background: var(--amber);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .scan-flash.flash { animation: flashfade 0.4s ease-out; }
+  @keyframes flashfade { 0% { opacity: 0.18; } 100% { opacity: 0; } }
+
+  .actions {
+    margin-top: 18px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+
+  #camBtn {
+    font-family: 'Archivo', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    letter-spacing: 0.01em;
+    background: var(--amber);
+    color: #1a1600;
+    border: none;
+    border-radius: var(--radius);
+    padding: 13px 26px;
+    cursor: pointer;
+    transition: background 0.15s ease, transform 0.05s ease;
+  }
+  #camBtn:hover { background: #ffc61a; }
+  #camBtn:active { transform: translateY(1px); }
+  #camBtn.stop {
+    background: var(--panel-raised);
+    color: var(--paper);
+    border: 1px solid var(--hairline);
+  }
+  #camBtn.stop:hover { background: var(--panel); }
+
+  .status-txt {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12.5px;
+    color: var(--paper-dim);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .spinner {
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 2px solid var(--hairline);
+    border-top-color: var(--amber);
+    animation: spin 0.7s linear infinite;
+    flex-shrink: 0;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .fallback-box {
+    margin-top: 16px;
+    display: none;
+    border: 1px solid var(--hairline);
+    border-radius: var(--radius);
+    background: var(--panel);
+    padding: 16px;
+  }
+  .fallback-box.show { display: block; }
+  .fallback-box p { font-size: 13.5px; color: var(--paper-dim); line-height: 1.55; margin: 0 0 12px; }
+  .fallback-box input { display: block; font-size: 13.5px; color: var(--paper); }
+
+  .results {
+    margin-top: 32px;
+    display: none;
+  }
+  .results.show { display: block; }
+
+  .results h2 {
+    font-family: 'Archivo', sans-serif;
+    font-weight: 700;
+    font-size: 15px;
+    margin: 0 0 4px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid var(--hairline);
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+  }
+  .results h2 span.updated {
+    font-family: 'IBM Plex Mono', monospace;
+    font-weight: 400;
+    font-size: 11.5px;
+    color: var(--paper-dim);
+  }
+
+  .tag-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--hairline);
+  }
+  .tag-row:last-child { border-bottom: none; }
+
+  .swatch {
+    width: 13px;
+    height: 13px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .tag-label { width: 118px; flex-shrink: 0; font-size: 14px; }
+  .tag-label .id-en { display: block; }
+  .tag-label .id-local { display: block; font-size: 11.5px; color: var(--paper-dim); }
+
+  .bar-track {
+    flex: 1;
+    height: 8px;
+    background: var(--panel-raised);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    width: 0%;
+    transition: width 0.4s ease;
+  }
+
+  .tag-pct {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 13px;
+    width: 52px;
+    text-align: right;
+    flex-shrink: 0;
+  }
+
+  .empty-note, .error-note {
+    margin-top: 32px;
+    padding: 14px 16px;
+    border-radius: var(--radius);
+    font-size: 13.5px;
+    line-height: 1.55;
+    display: none;
+  }
+  .empty-note.show, .error-note.show { display: block; }
+  .empty-note {
+    background: var(--panel);
+    border: 1px solid var(--hairline);
+    color: var(--paper-dim);
+  }
+  .error-note {
+    background: rgba(226, 87, 76, 0.1);
+    border: 1px solid rgba(226, 87, 76, 0.4);
+    color: #f0a49d;
+  }
+  .error-note a { color: #f0a49d; }
+
+  details.howitworks {
+    margin-top: 40px;
+    border-top: 1px solid var(--hairline);
+    padding-top: 16px;
+  }
+  details.howitworks summary {
+    cursor: pointer;
+    font-size: 13px;
+    color: var(--paper-dim);
+    font-family: 'IBM Plex Mono', monospace;
+  }
+  details.howitworks summary:hover { color: var(--paper); }
+  details.howitworks .body {
+    font-size: 13.5px;
+    line-height: 1.65;
+    color: var(--paper-dim);
+    margin-top: 12px;
+  }
+  details.howitworks .body a { color: var(--amber); }
+  details.howitworks code {
+    font-family: 'IBM Plex Mono', monospace;
+    background: var(--panel);
+    padding: 1px 5px;
+    border-radius: 3px;
+    font-size: 12.5px;
+  }
+</style>
+</head>
+<body>
+<main>
+
+  <div class="hazard-rule"></div>
+
+  <header>
+    <h1>Pemilah Sampah</h1>
+    <p>
+      Arahkan kamera ke sampah — model <a href="https://huggingface.co/watersplash/waste-classification" target="_blank" rel="noopener">watersplash/waste-classification</a>
+      akan menebak kategorinya tiap beberapa detik, tanpa perlu ambil/kirim foto manual.
+    </p>
+  </header>
+
+  <div class="meta-line">
+    <span>arsitektur: <b>ViT</b></span>
+    <span>parameter: <b>85.8M</b></span>
+    <span>kelas: <b>12</b></span>
+    <span>akurasi klaim: <b>98%</b></span>
+  </div>
+
+  <div class="cam-box" id="camBox">
+    <video id="camView" autoplay playsinline muted></video>
+    <div class="scan-flash" id="scanFlash"></div>
+    <div class="live-pill"><span class="live-dot"></span><span>LIVE</span></div>
+    <div class="cam-placeholder">
+      <svg class="cam-icon" viewBox="0 0 40 40" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="4" y="11" width="32" height="22" rx="3" stroke="currentColor" stroke-width="2.5"/>
+        <circle cx="20" cy="22" r="6.5" stroke="currentColor" stroke-width="2.5"/>
+        <path d="M14 11L16.5 7H23.5L26 11" stroke="currentColor" stroke-width="2.5" stroke-linejoin="round"/>
+      </svg>
+      <div class="primary-txt">Kamera belum aktif</div>
+      <div class="secondary-txt">Tekan "Mulai kamera" di bawah</div>
+    </div>
+  </div>
+
+  <div class="actions">
+    <button id="camBtn">Mulai kamera</button>
+    <div class="status-txt" id="statusTxt"></div>
+  </div>
+
+  <div class="fallback-box" id="fallbackBox">
+    <p id="fallbackMsg">Kamera langsung tidak bisa diakses di sini. Kamu masih bisa ambil satu foto lewat kamera perangkat:</p>
+    <input type="file" id="fallbackInput" accept="image/*" capture="environment" />
+  </div>
+
+  <div class="results" id="results">
+    <h2>Hasil <span class="updated" id="updatedTxt"></span></h2>
+    <div id="resultRows"></div>
+  </div>
+
+  <div class="empty-note" id="emptyNote">
+    Tidak ada kelas dengan keyakinan di atas 50%. Coba dekatkan objek atau perbaiki pencahayaan.
+  </div>
+
+  <div class="error-note" id="errorNote"></div>
+
+  <details class="howitworks">
+    <summary>kenapa live, bukan sekali kirim foto?</summary>
+    <div class="body">
+      Modelnya sendiri tidak jalan di browser — dia diunggah sebagai bobot PyTorch (<code>.safetensors</code>)
+      saja, tanpa versi ONNX dan tanpa deployment di HF Inference Providers, jadi tidak bisa dipanggil langsung
+      lewat Transformers.js. Halaman ini mengambil frame dari kamera tiap ~2.5 detik lalu mengirimkannya ke API
+      <a href="https://huggingface.co/spaces/November-2K25/Multi-Label-Waste-Sorting-App" target="_blank" rel="noopener">Space komunitas</a>
+      yang memuat model yang sama persis lewat <code>transformers</code> di server HF — jadi terasa "live" walau
+      bukan video streaming asli. Space gratis bisa "tidur" kalau lama tidak dipakai, jadi permintaan pertama bisa
+      lambat (~30–60 detik) sebelum lancar.
+    </div>
+  </details>
+
+</main>
+
+<script type="module">
+  import { Client, handle_file } from "https://cdn.jsdelivr.net/npm/@gradio/client/dist/index.min.js";
+
+  const SPACE_ID = "November-2K25/Multi-Label-Waste-Sorting-App";
+  const SPACE_URL = "https://huggingface.co/spaces/" + SPACE_ID;
+  const SCAN_INTERVAL_MS = 2500;
+
+  const CLASS_INFO = {
+    "Battery":     { id: "Baterai",         color: "#e2574c" },
+    "Biological":  { id: "Organik",         color: "#6b8f4e" },
+    "Brown-grass": { id: "Rumput kering",   color: "#a98b5d" },
+    "Cardboard":   { id: "Kardus",          color: "#b98655" },
+    "Clothes":     { id: "Pakaian",         color: "#8e6c88" },
+    "Green-Glass": { id: "Kaca hijau",      color: "#3f7d5c" },
+    "Metal":       { id: "Logam",           color: "#9aa5aa" },
+    "Paper":       { id: "Kertas",          color: "#d8d2c4" },
+    "Plastic":     { id: "Plastik",         color: "#3e8fb0" },
+    "Shoes":       { id: "Sepatu",          color: "#6b4f3f" },
+    "Trash":       { id: "Sampah umum",     color: "#8a8a8a" },
+    "White-Glass": { id: "Kaca bening",     color: "#c9cfc9" },
+  };
+
+  const camBox = document.getElementById('camBox');
+  const camView = document.getElementById('camView');
+  const camBtn = document.getElementById('camBtn');
+  const scanFlash = document.getElementById('scanFlash');
+  const statusTxt = document.getElementById('statusTxt');
+  const fallbackBox = document.getElementById('fallbackBox');
+  const fallbackMsg = document.getElementById('fallbackMsg');
+  const fallbackInput = document.getElementById('fallbackInput');
+  const resultsEl = document.getElementById('results');
+  const resultRows = document.getElementById('resultRows');
+  const updatedTxt = document.getElementById('updatedTxt');
+  const emptyNote = document.getElementById('emptyNote');
+  const errorNote = document.getElementById('errorNote');
+
+  let stream = null;
+  let loopTimer = null;
+  let inFlight = false;
+  let clientPromise = null;
+  let canvas = document.createElement('canvas');
+
+  function resetOutputs() {
+    resultsEl.classList.remove('show');
+    emptyNote.classList.remove('show');
+    errorNote.classList.remove('show');
+    resultRows.innerHTML = '';
+  }
+
+  function setStatus(msg, spinning) {
+    statusTxt.innerHTML = spinning
+      ? '<span class="spinner"></span><span>' + msg + '</span>'
+      : (msg ? '<span>' + msg + '</span>' : '');
+  }
+
+  function showError(message, showLink) {
+    errorNote.innerHTML = message + (showLink
+      ? ' Kamu juga bisa coba langsung buka <a href="' + SPACE_URL + '" target="_blank" rel="noopener">Space-nya di sini</a>.'
+      : '');
+    errorNote.classList.add('show');
+  }
+
+  async function getClient() {
+    if (!clientPromise) {
+      clientPromise = Client.connect(SPACE_ID, {
+        status_callback: (status) => {
+          if (status.stage === 'pending') {
+            setStatus('Membangunkan Space (bisa 30–60 detik jika baru pertama kali)…', true);
+          }
+        }
+      });
+    }
+    return clientPromise;
+  }
+
+  function parseResultText(text) {
+    if (!text || /no clear classification/i.test(text)) return [];
+    return text
+      .split('\n')
+      .map(line => {
+        const m = line.match(/^(.+?):\s*([\d.]+)\s*%/);
+        if (!m) return null;
+        return { label: m[1].trim(), pct: parseFloat(m[2]) };
+      })
+      .filter(Boolean);
+  }
+
+  function renderResults(rows) {
+    emptyNote.classList.remove('show');
+    errorNote.classList.remove('show');
+    if (rows.length === 0) {
+      resultsEl.classList.remove('show');
+      emptyNote.classList.add('show');
+      return;
+    }
+    rows.sort((a, b) => b.pct - a.pct);
+    resultRows.innerHTML = '';
+    rows.forEach(row => {
+      const info = CLASS_INFO[row.label] || { id: row.label, color: '#888' };
+      const div = document.createElement('div');
+      div.className = 'tag-row';
+      div.innerHTML =
+        '<div class="swatch" style="background:' + info.color + '"></div>' +
+        '<div class="tag-label"><span class="id-en">' + row.label + '</span><span class="id-local">' + info.id + '</span></div>' +
+        '<div class="bar-track"><div class="bar-fill" style="background:' + info.color + '"></div></div>' +
+        '<div class="tag-pct">' + row.pct.toFixed(1) + '%</div>';
+      resultRows.appendChild(div);
+      requestAnimationFrame(() => {
+        div.querySelector('.bar-fill').style.width = Math.min(row.pct, 100) + '%';
+      });
+    });
+    resultsEl.classList.add('show');
+    updatedTxt.textContent = 'diperbarui ' + new Date().toLocaleTimeString('id-ID');
+  }
+
+  function captureFrameBlob() {
+    const w = camView.videoWidth, h = camView.videoHeight;
+    if (!w || !h) return Promise.resolve(null);
+    const maxDim = 448;
+    const scale = Math.min(1, maxDim / Math.max(w, h));
+    canvas.width = Math.round(w * scale);
+    canvas.height = Math.round(h * scale);
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(camView, 0, 0, canvas.width, canvas.height);
+    return new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.85));
+  }
+
+  async function runScan() {
+    if (inFlight || !stream) return;
+    inFlight = true;
+    scanFlash.classList.remove('flash');
+    void scanFlash.offsetWidth;
+    scanFlash.classList.add('flash');
+
+    try {
+      const blob = await captureFrameBlob();
+      if (!blob) { inFlight = false; return; }
+      setStatus('Menganalisis…', true);
+      const client = await getClient();
+      const result = await client.predict('/predict', [handle_file(blob)]);
+      const text = Array.isArray(result.data) ? result.data[0] : result.data;
+      renderResults(parseResultText(String(text || '')));
+      setStatus('Live — memindai tiap ' + (SCAN_INTERVAL_MS / 1000) + ' detik', false);
+    } catch (err) {
+      console.error(err);
+      clientPromise = null;
+      setStatus('Gagal terhubung ke model.', false);
+      showError('Tidak bisa menghubungi Space demo (mungkin sedang sibuk, tidur lama, atau offline).', true);
+    } finally {
+      inFlight = false;
+    }
+  }
+
+  async function startCamera() {
+    resetOutputs();
+    try {
+      stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: { ideal: 'environment' } },
+        audio: false
+      });
+      camView.srcObject = stream;
+      camBox.classList.add('active');
+      fallbackBox.classList.remove('show');
+      camBtn.textContent = 'Berhenti';
+      camBtn.classList.add('stop');
+      setStatus('Menyalakan…', true);
+
+      camView.onloadedmetadata = () => {
+        runScan();
+        loopTimer = setInterval(runScan, SCAN_INTERVAL_MS);
+      };
+    } catch (err) {
+      console.error(err);
+      stream = null;
+      let msg = 'Kamera langsung tidak bisa diakses di sini (izin ditolak, tidak ada kamera, atau halaman ini tidak dibuka lewat koneksi yang aman). ';
+      if (location.protocol === 'file:') {
+        msg = 'Browser biasanya memblokir akses kamera untuk file yang dibuka langsung dari penyimpanan (file://). ';
+      }
+      fallbackMsg.textContent = msg + 'Kamu masih bisa ambil satu foto lewat kamera perangkat:';
+      fallbackBox.classList.add('show');
+      setStatus('', false);
+    }
+  }
+
+  function stopCamera() {
+    if (loopTimer) clearInterval(loopTimer);
+    loopTimer = null;
+    if (stream) stream.getTracks().forEach(t => t.stop());
+    stream = null;
+    camView.srcObject = null;
+    camBox.classList.remove('active');
+    camBtn.textContent = 'Mulai kamera';
+    camBtn.classList.remove('stop');
+    setStatus('', false);
+  }
+
+  camBtn.addEventListener('click', () => {
+    if (stream) stopCamera();
+    else startCamera();
+  });
+
+  fallbackInput.addEventListener('change', async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    resetOutputs();
+    setStatus('Menganalisis…', true);
+    try {
+      const client = await getClient();
+      const result = await client.predict('/predict', [handle_file(file)]);
+      const text = Array.isArray(result.data) ? result.data[0] : result.data;
+      renderResults(parseResultText(String(text || '')));
+      setStatus('Selesai.', false);
+    } catch (err) {
+      console.error(err);
+      clientPromise = null;
+      setStatus('Gagal memproses.', false);
+      showError('Tidak bisa menghubungi Space demo.', true);
+    }
+  });
+
+  window.addEventListener('beforeunload', stopCamera);
+</script>
+
+</body>
+</html>
